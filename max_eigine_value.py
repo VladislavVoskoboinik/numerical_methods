@@ -18,8 +18,8 @@ def EigenvalueFinding(A,S_max,N) :
     y = zeros((S_max+1,N-1))
     y[0] = 1.
     for s in range(S_max) :
-        y[s+1] = linalg.solve(A(x,h,N),y[s])
-        lambd[s+1] = 1/(dot(y[s+1],y[s+1])/dot(y[s],y[s+1]))
+        y[s+1] = linalg.solve(linalg.inv(A(x,h,N)),y[s])
+        lambd[s+1] = (dot(y[s+1],y[s+1])/dot(y[s],y[s+1]))
         eigenvalue = lambd[s+1]
     return eigenvalue
 
@@ -33,6 +33,8 @@ p_eff = zeros((S,S))
 
 for s in range(S) :
     L[s,0] = EigenvalueFinding(A,S_max,r**s*N)
+    print(A)
+
 
 for s in range(1,S) :
     for l in range(s) :
@@ -67,6 +69,6 @@ plot([r**s*N for s in range(1,S)],abs(R[1:,0]),'-bo')
 xscale('log'); yscale('log')
 
 # Листинг программы, реализущей приближённое вычисление
-# минимального собсенного значение задачи Штурма-Лиувилля
+# минимального собственного значение задачи Штурма-Лиувилля
 # с помощью рекурретного сгущения сеток и многократного повышения
 # точности по Ричардсону (с вычислением эффективных порядков точности)
