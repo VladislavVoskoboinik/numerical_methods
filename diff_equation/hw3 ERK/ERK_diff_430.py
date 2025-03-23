@@ -5,20 +5,24 @@ import matplotlib.pyplot as plt
 # differential equation: y'' = 2*(y-1) * ctg(x), y(pi/2) = 1
 
 # Параметры
-x_0 = np.pi/2       # Начальное значение x
+x_0 = np.pi/2# Начальное значение x
 y_0 = 1         # Начальное значение y
 v_0 = 0         # Начальное значение v (y')
-w_0 = 1         # Начальное значение w (y'')
-X = 10         #Конец отрезка
-M = 50
-x_grid, tau =  np.linspace(x_0, X, M+1, retstep=True)
-
+w_0 = 1     # Начальное значение w (y'')
+X = 100     #Конец отрезка
+M = 100000
+tau = 0.2
+p = 3
+eps = 0.1 #Дифур абстрактый, поэтому не получится прикинуть значений eps заранее
+#x_grid, tau =  np.linspace(x_0, X, M+1, retstep=True)
+x = np.empty(M + 1)
 u = np.empty((M+1, 3))
 u[0] = [y_0, v_0, w_0]
-u_ERK2 = np.empty((M+1, 3))
-u_ERK2[0] = [y_0, v_0, w_0]
-u_ERK4 = np.empty((M+1, 3))
-u_ERK4[0] = [y_0, v_0, w_0]
+x[0] = x_0
+#u_ERK2 = np.empty((M+1, 3))
+#u_ERK2[0] = [y_0, v_0, w_0]
+#u_ERK4 = np.empty((M+1, 3))
+#u_ERK4[0] = [y_0, v_0, w_0]
 
 def f(u, x):
     f = np.empty(3)
@@ -30,6 +34,7 @@ def f(u, x):
 
 
 #Euler
+''''
 for m in range(0, M):
     u[m+1] = u[m] + tau * f(u[m], x_grid[m])
 
@@ -49,16 +54,47 @@ for m in range(0, M): #ERK4
     w4 = f(u_ERK4[m] + tau * w3, x_grid[m] + tau)
     u_ERK4[m+1] = u_ERK4[m] + tau*(w1 / 6 + w2 / 3 + w3 / 3 + w4 / 6)
 
+'''''
 
+m = 0
+while x[m] < X and m <= M:
+    w_1 = f(u[m], x[m])
+    w_2 = f(u[m] + 1/2*tau*w_1, x[m] + 1/2*tau)
+    w_3 = f(u[m] + 3/4*tau*w_2, x[m] + 3/4*tau)
+    u[m+1] = u[m] + tau*(2/9*w_1 + 3/9*w_2 + 4/9*w_3) 
+    
+    u_emb = u[m] + tau*w_2
+    
+    error = np.sqrt(np.sum((u[m+1] - u_emb)**2))
+    if error > eps:  # Защита от слишком малых значений
+        tau_new = tau * (eps/error)**(1/(p-1))
+        tau = min(tau_new, 2*tau)  # Ограничиваем максимальный рост шага
+    else:
+        tau = 2*tau  # Если ошибка слишком мала, увеличиваем шаг
+        
+    
+    print(f'm={m} : tau={tau}')
+    
+    w_1 = f(u[m], x[m])
+    w_2 = f(u[m] + 1/2*tau*w_1, x[m] + 1/2*tau)
+    w_3 = f(u[m] + 3/4*tau*w_2, x[m] + 3/4*tau)
+    u[m+1] = u[m] + tau*(2/9*w_1 + 3/9*w_2 + 4/9*w_3) 
+    
+    x[m+1] = x[m] + tau
+    
+    m = m + 1
+
+u = u[:m+1]
+x = x[:m+1]
 # Аналитическое решение
-y_analytical = 0.5 * x_grid**2 - np.pi * x_grid * 0.5 + 1 + (np.pi ** 2) / 8
+y_analytical = 0.5 * x**2 - np.pi * x * 0.5 + 1 + (np.pi ** 2) / 8
 
 
 # Построение графика
-plt.plot(x_grid, u[:, 0], label='Эйлер', color = 'red')
-plt.plot(x_grid, u_ERK2[:, 0], label = "ERK2")
-plt.plot(x_grid, u_ERK4[:, 0], label = "ERK4")
-plt.plot(x_grid, y_analytical, label='Аналитическое решение', linestyle = "--", color = 'green')
+plt.plot(x, u[:, 0], label='ERK3', color = 'red')
+#plt.plot(x, u_ERK2[:, 0], label = "ERK2")
+#plt.plot(x, u_ERK4[:, 0], label = "ERK3")
+plt.plot(x, y_analytical, label='Аналитическое решение', linestyle = "--", color = 'green')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.title('Решение уравнения третьего порядка')
