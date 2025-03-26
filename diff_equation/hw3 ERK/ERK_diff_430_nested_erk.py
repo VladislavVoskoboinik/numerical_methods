@@ -9,8 +9,8 @@ x_0 = np.pi/2# Начальное значение x
 y_0 = 1         # Начальное значение y
 v_0 = 0         # Начальное значение v (y')
 w_0 = 1     # Начальное значение w (y'')
-X = 100     #Конец отрезка
-M = 100000
+X = 10    #Конец отрезка
+M = 100
 tau = 0.2
 p = 3
 eps = 0.1 #Дифур абстрактый, поэтому не получится прикинуть значений eps заранее
@@ -65,15 +65,16 @@ while x[m] < X and m <= M:
     
     u_emb = u[m] + tau*w_2
     
-    error = np.sqrt(np.sum((u[m+1] - u_emb)**2))
+    error = np.linalg.norm(u[m + 1] - u_emb)
+    #error = np.sqrt(np.sum((u[m+1] - u_emb)**2))
     if error > eps:  # Защита от слишком малых значений
-        tau_new = tau * (eps/error)**(1/(p-1))
+        tau_new = tau * (eps/(error*(X-x_0)))**(1/(p-1))
         tau = min(tau_new, 2*tau)  # Ограничиваем максимальный рост шага
     else:
         tau = 2*tau  # Если ошибка слишком мала, увеличиваем шаг
         
     
-    print(f'm={m} : tau={tau}')
+    print(f'm={m} : tau={tau}', x[m])
     
     w_1 = f(u[m], x[m])
     w_2 = f(u[m] + 1/2*tau*w_1, x[m] + 1/2*tau)
@@ -91,13 +92,15 @@ y_analytical = 0.5 * x**2 - np.pi * x * 0.5 + 1 + (np.pi ** 2) / 8
 
 
 # Построение графика
-plt.plot(x, u[:, 0], label='ERK3', color = 'red')
+plt.plot(x, u[:, 0], label='ERK3', marker = 'o', color = 'red')
 #plt.plot(x, u_ERK2[:, 0], label = "ERK2")
 #plt.plot(x, u_ERK4[:, 0], label = "ERK3")
 plt.plot(x, y_analytical, label='Аналитическое решение', linestyle = "--", color = 'green')
+plt.xlim(left = 0)
+plt.ylim(bottom = 0)
 plt.xlabel('x')
 plt.ylabel('y')
-plt.title('Решение уравнения третьего порядка')
+plt.title('Решение уравнения третьего порядка\nВыбор шага методом вложенной схемы')
 plt.legend()
 plt.grid(True)
 plt.show()
