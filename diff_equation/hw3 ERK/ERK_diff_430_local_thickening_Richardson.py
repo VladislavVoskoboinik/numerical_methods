@@ -1,3 +1,5 @@
+#Файл в разработке
+
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -67,7 +69,23 @@ def ERK3_local_thickening(M, eps, x_0, X):
 
     return np.array(x), np.array(u)
 
-x, u = ERK3_local_thickening(r * M, eps, x_0, X)
+#x, u = ERK3_local_thickening(r * M, eps, x_0, X)
+
+u_richardson = [[] * S] * S
+R = [[] * S] * S
+p_eff = [[] * S] * S
+#u_richardson = np.array(data)
+#u_richardson = np.zeros((S, (S, (M, 3))))
+
+for s in range(1, S):
+    x, u = ERK3_local_thickening(r**s * M, eps, x_0, X)
+    u_richardson[s:0].append(u[:, 0])
+
+print(u_richardson)
+for s in range(1, S):
+    for l in range(S):
+        R[s, l] = (u_richardson[s, l] - u_richardson[s-1, l]) / (r ** (p + l * q) - 1)
+        u_richardson[s, l+1] = u_richardson[s, l] + R[s, l]
 
 '''''
 while x[m] < X:
