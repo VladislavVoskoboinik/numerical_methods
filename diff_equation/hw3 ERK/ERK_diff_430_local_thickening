@@ -1,0 +1,106 @@
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+
+# differential equation: y'' = 2*(y-1) * ctg(x), y(pi/2) = 1
+
+# Параметры
+x_0 = np.pi/2# Начальное значение x
+y_0 = 1         # Начальное значение y
+v_0 = 0         # Начальное значение v (y')
+w_0 = 1     # Начальное значение w (y'')
+X = 100     #Конец отрезка
+M = 100000
+tau = 0.2
+p = 3
+eps = 0.1 #Дифур абстрактый, поэтому не получится прикинуть значений eps заранее
+
+r = 2 # Коэффициент сгущения
+tau = (X - x_0) / M
+
+u = np.empty((M+1, 3))
+u_thickened = np.empty((M*r + 1, 3))
+
+u[0] = [y_0, v_0, w_0]
+u_thickened[0] = [y_0, v_0, w_0]
+
+u_res[0] = [y_0, v_0, w_0]
+u_res = np.empty((M+1, 3))
+
+
+
+
+def f(u, x):
+    f = np.empty(3)
+    f[0] = u[1]
+    f[1] = u[2]
+    f[2] = 2 * (u[2] - 1) * np.cos(x)/np.sin(x) 
+
+    return f
+
+def ERK3_step(current_x, current_u, current_step):
+    w_1 = f(current_u, current_x)
+    w_2 = f(current_u + 1/2*current_step*w_1, current_x + 1/2 * current_step)
+    w_3 = f(current_u + 3/4 * current_step * w_2, current_x + 3/4 * current_step)
+    return current_u + current_step * (2/9*w_1 + 3/9 * w_2 + 4/9 * w_3)
+
+
+x = [x_0]
+m = 0
+while m < M:
+    u[m + 1] = ERK3_step(x[m], u[m], tau)
+    u_thickened[m + 1] = ERK3_step(x[m], u_thickened[m], tau/r)
+    u_thickened[m + 1] = ERK3_step(x[m] + tau/r, u_thickened[m], tau/r)
+    error = np.abs(u[m + 1] - u_thickened[m + 1])
+    if error > eps:  # Защита от слишком малых значений
+        tau_new = tau * (eps/error)**(1/(p-1))
+        tau = min(tau_new, 2*tau)  # Ограничиваем максимальный рост шага
+    else:
+        tau = 2*tau  # Если ошибка слишком мала, увеличиваем шаг
+
+
+    m += 1
+
+    
+while x[m] < X:
+    w_1 = f(u[m], x[m])
+    w_2 = f(u[m] + 1/2*tau*w_1, x[m] + 1/2*tau)
+    w_3 = f(u[m] + 3/4*tau*w_2, x[m] + 3/4*tau)
+    u[m+1] = u[m] + tau*(2/9*w_1 + 3/9*w_2 + 4/9*w_3) 
+    
+    error = np.sqrt(np.sum((u[m+1] - u_emb)**2))
+    if error > eps:  # Защита от слишком малых значений
+        tau_new = tau * (eps/error)**(1/(p-1))
+        tau = min(tau_new, 2*tau)  # Ограничиваем максимальный рост шага
+    else:
+        tau = 2*tau  # Если ошибка слишком мала, увеличиваем шаг
+        
+    
+    print(f'm={m} : tau={tau}')
+    
+    w_1 = f(u[m], x[m])
+    w_2 = f(u[m] + 1/2*tau*w_1, x[m] + 1/2*tau)
+    w_3 = f(u[m] + 3/4*tau*w_2, x[m] + 3/4*tau)
+    u[m+1] = u[m] + tau*(2/9*w_1 + 3/9*w_2 + 4/9*w_3) 
+    
+    x[m+1] = x[m] + tau
+    
+    m = m + 1
+
+u = u[:m+1]
+x = x[:m+1]
+# Аналитическое решение
+y_analytical = 0.5 * x**2 - np.pi * x * 0.5 + 1 + (np.pi ** 2) / 8
+
+
+# Построение графика
+plt.plot(x, u[:, 0], label='ERK3', marker = 'o', color = 'red')
+#plt.plot(x, u_ERK2[:, 0], label = "ERK2")
+#plt.plot(x, u_ERK4[:, 0], label = "ERK3")
+plt.plot(x, y_analytical, label='Аналитическое решение', linestyle = "--", color = 'green')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Решение уравнения третьего порядка')
+plt.legend()
+plt.grid(True)
+plt.show()
