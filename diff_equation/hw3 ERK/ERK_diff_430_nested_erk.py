@@ -13,7 +13,7 @@ X = 10    #Конец отрезка
 M = 100
 tau = 0.2
 p = 3
-eps = 0.1 #Дифур абстрактый, поэтому не получится прикинуть значений eps заранее
+eps = 1e-12 
 #x_grid, tau =  np.linspace(x_0, X, M+1, retstep=True)
 x = np.empty(M + 1)
 u = np.empty((M+1, 3))
@@ -65,13 +65,14 @@ while x[m] < X and m <= M:
     
     u_emb = u[m] + tau*w_2
     
-    error = np.linalg.norm(u[m + 1] - u_emb)
+    error = np.linalg.norm(u[m + 1][0] - u_emb[0])
+    print(error)
     #error = np.sqrt(np.sum((u[m+1] - u_emb)**2))
     if error > eps:  # Защита от слишком малых значений
         tau_new = tau * (eps/(error*(X-x_0)))**(1/(p-1))
-        tau = min(tau_new, 2*tau)  # Ограничиваем максимальный рост шага
+        #tau = min(tau_new, 2*tau)  # Ограничиваем максимальный рост шага
     else:
-        tau = 2*tau  # Если ошибка слишком мала, увеличиваем шаг
+        tau = 1.1*tau  # Если ошибка слишком мала, увеличиваем шаг
         
     
     print(f'm={m} : tau={tau}', x[m])
@@ -88,14 +89,15 @@ while x[m] < X and m <= M:
 u = u[:m+1]
 x = x[:m+1]
 # Аналитическое решение
-y_analytical = 0.5 * x**2 - np.pi * x * 0.5 + 1 + (np.pi ** 2) / 8
+x_analytical = np.linspace(x_0, X, M*4)
+y_analytical = 0.5 * x_analytical**2 - np.pi * x_analytical * 0.5 + 1 + (np.pi ** 2) / 8
 
 
 # Построение графика
 plt.plot(x, u[:, 0], label='ERK3', marker = 'o', color = 'red')
 #plt.plot(x, u_ERK2[:, 0], label = "ERK2")
 #plt.plot(x, u_ERK4[:, 0], label = "ERK3")
-plt.plot(x, y_analytical, label='Аналитическое решение', linestyle = "--", color = 'green')
+plt.plot(x_analytical, y_analytical, label='Аналитическое решение', linestyle = "--", color = 'green')
 plt.xlim(left = 0)
 plt.ylim(bottom = 0)
 plt.xlabel('x')

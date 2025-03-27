@@ -64,8 +64,9 @@ while x[m] < X and m <= M:
     u[m+1] = u[m] + tau*(2/9*w_1 + 3/9*w_2 + 4/9*w_3) 
     
     u_emb = u[m] + tau*w_2
-    
-    error = np.sqrt(np.sum((u[m+1] - u_emb)**2))
+    error = np.linalg.norm(u[m+1] - u_emb)
+    print(error)
+    #error = np.sqrt(np.sum((u[m+1] - u_emb)**2))
     if error > eps:  # Защита от слишком малых значений
         tau_new = tau * (eps/error)**(1/(p-1))
         tau = min(tau_new, 2*tau)  # Ограничиваем максимальный рост шага
@@ -87,14 +88,15 @@ while x[m] < X and m <= M:
 u = u[:m+1]
 x = x[:m+1]
 # Аналитическое решение
-y_analytical = 0.5 * x**2 - np.pi * x * 0.5 + 1 + (np.pi ** 2) / 8
+x_analytical = np.linspace(x_0, X, M*4)
+y_analytical = 0.5 * x_analytical**2 - np.pi * x_analytical * 0.5 + 1 + (np.pi ** 2) / 8
 
 
 # Построение графика
 plt.plot(x, u[:, 0], label='ERK3', color = 'red')
 #plt.plot(x, u_ERK2[:, 0], label = "ERK2")
 #plt.plot(x, u_ERK4[:, 0], label = "ERK3")
-plt.plot(x, y_analytical, label='Аналитическое решение', linestyle = "--", color = 'green')
+plt.plot(x_analytical, y_analytical, label='Аналитическое решение', linestyle = "--", color = 'green')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.title('Решение уравнения третьего порядка')
