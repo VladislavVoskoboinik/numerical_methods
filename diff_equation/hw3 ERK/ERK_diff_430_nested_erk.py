@@ -24,7 +24,7 @@ x[0] = x_0
 #u_ERK4 = np.empty((M+1, 3))
 #u_ERK4[0] = [y_0, v_0, w_0]
 
-def f(u, x):
+def f(u, x) -> np.array:
     f = np.empty(3)
     f[0] = u[1]
     f[1] = u[2]

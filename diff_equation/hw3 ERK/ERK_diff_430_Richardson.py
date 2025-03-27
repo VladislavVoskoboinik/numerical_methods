@@ -23,7 +23,7 @@ u = [[y_0, v_0, w_0]]
 u_0 = [y_0, v_0, w_0]
 
 
-def f(u, x):
+def f(u, x) -> np.array: 
     f = np.empty(3)
     f[0] = u[1]
     f[1] = u[2]
@@ -31,14 +31,14 @@ def f(u, x):
 
     return f
 
-def ERK3_step(current_x, current_u, current_step):
+def ERK3_step(current_x, current_u, current_step) -> np.array:
     w_1 = f(current_u, current_x)
     w_2 = f(current_u + 1/2*current_step*w_1, current_x + 1/2 * current_step)
     w_3 = f(current_u + 3/4 * current_step * w_2, current_x + 3/4 * current_step)
     return current_u + current_step * (2/9*w_1 + 3/9 * w_2 + 4/9 * w_3)
 
 
-def ERK3(M, u_0, x_0, X):
+def ERK3(M, u_0, x_0, X) -> tuple[np.array, np.array]:
     x, tau = np.linspace(x_0, X, M+1, retstep = True)
     u = np.empty((M+1, 3))
     u[0] = [y_0, v_0, w_0]
@@ -52,10 +52,10 @@ def ERK3(M, u_0, x_0, X):
     return x, u
 
 
-def richardson_extrapolation_ERK3(f, u_0, x_0, X, epsilon=1e-6, r=2, p=3, q=1, S=5, M_0=2):
+def richardson_extrapolation_ERK3(f, u_0, x_0, X, epsilon=1e-6, r=2, p=3, q=1, S=5, M_0=2) -> list[np.array, np.array, dict] :
     """
     Реализация метода сгущения сеток Ричардсона для ERK3
-    
+    dict
     Параметры:
     f - функция правой части ОДУ
     u_0 - начальные условия [y0, v0, w0]

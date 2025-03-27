@@ -23,7 +23,7 @@ u_thickened = [[y_0, v_0, w_0]]
 
 
 
-def f(u, x):
+def f(u, x) -> np.array:
     f = np.empty(3)
     f[0] = u[1]
     f[1] = u[2]
@@ -31,14 +31,14 @@ def f(u, x):
 
     return f
 
-def ERK3_step(current_x, current_u, current_step):
+def ERK3_step(current_x, current_u, current_step) -> np.array:
     w_1 = f(current_u, current_x)
     w_2 = f(current_u + 1/2*current_step*w_1, current_x + 1/2 * current_step)
     w_3 = f(current_u + 3/4 * current_step * w_2, current_x + 3/4 * current_step)
     return current_u + current_step * (2/9*w_1 + 3/9 * w_2 + 4/9 * w_3)
 
 
-def ERK3_local_thickening(M, eps, x_0, X):
+def ERK3_local_thickening(M, eps, x_0, X) -> tuple[np.array, np.array]:
     tau = (X - x_0) / M
     u = [[y_0, v_0, w_0]]
     u_thickened = [[y_0, v_0, w_0]]
