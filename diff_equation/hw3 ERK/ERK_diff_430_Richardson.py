@@ -1,3 +1,5 @@
+#in development
+
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,11 +40,12 @@ def ERK3_step(current_x, current_u, current_step) -> np.array:
     return current_u + current_step * (2/9*w_1 + 3/9 * w_2 + 4/9 * w_3)
 
 
-def ERK3(M, u_0, x_0, X) -> tuple[np.array, np.array]:
-    x, tau = np.linspace(x_0, X, M+1, retstep = True)
+def ERK3(M, u_0, x) -> tuple[np.array, np.array]:
+    #x, tau = np.linspace(x_0, X, M+1, retstep = True) 
     u = np.empty((M+1, 3))
-    u[0] = [y_0, v_0, w_0]
-    for m in range(0, M): #ERK3
+    tau = (x[1]-x[0]) / M
+    u[0] = u_0
+    for m in range(0, len(x)): #ERK3
         w1 = f(u[m], x[m])
         w2 = f(u[m] + tau * w1 /2, x[m] + tau /2)
         w3 = f(u[m] + tau * w2 /2, x[m]+ tau /2)
@@ -52,7 +55,38 @@ def ERK3(M, u_0, x_0, X) -> tuple[np.array, np.array]:
     return x, u
 
 
-def richardson_extrapolation_ERK3(f, u_0, x_0, X, epsilon=1e-6, r=2, p=3, q=1, S=5, M_0=2) -> list[np.array, np.array, dict] :
+def ERK3_local_thickening(M, eps, x_0, X) -> tuple[np.array, np.array]:
+    tau = (X - x_0) / M
+    u = [[y_0, v_0, w_0]]
+    u_thickened = [[y_0, v_0, w_0]]
+    x = [x_0]
+    m = 0
+    while x[-1] < X and m <= M:
+        u.append(ERK3_step(x[-1], u[-1], tau))
+        u_thickened.append(ERK3_step(x[-1], u_thickened[-1], tau/r))
+        u_thickened.append(ERK3_step(x[-1] + tau/r, u_thickened[-1], tau/r))
+        print(u_thickened[-1], u[-1])
+        #error = np.sqrt(sum((u[m][j]**2 - u_thickened[m][j] ** 2) for i in range(3) for j in range(3)))
+        error = np.linalg.norm(u[-1][0] - u_thickened[-1][0])
+
+        x.append(x[-1] + tau)
+        if error > eps:  # Защита от слишком малых значений
+            tau = ((eps * (r**p - 1) * tau**(p+1)) / (error*(X-x_0))) **(1/p)
+            #tau = min(tau_new, 1.1*tau) 
+        else:
+            tau = 1.1*tau  # Если ошибка слишком мала, увеличиваем шаг
+
+        print(f'x[-1]={x[-1]} : tau={tau}')
+        
+        m += 1
+
+    x = np.array(x)
+    u = np.array(u)
+
+    return np.array(x), np.array(u)
+
+
+def richardson_extrapolation_ERK3_local_thickening(f, u_0, x_0, X, epsilon=1e-6, r=2, p=3, q=1, S=5, M_0=2) -> list[np.array, np.array, dict] :
     """
     Реализация метода сгущения сеток Ричардсона для ERK3
     dict
@@ -80,11 +114,14 @@ def richardson_extrapolation_ERK3(f, u_0, x_0, X, epsilon=1e-6, r=2, p=3, q=1, S
     
     solutions = []
     converged = False
-
-    for s in range(S):
+    x, u = ERK3_local_thickening(M_0, eps, x_0, X)
+    solutions.append((x, u))
+    U[0, 0] = u[-1]
+    M_0 = len(x)
+    for s in range(1, S):
         M = r**s * M_0
-        x, u = ERK3(M, u_0, x_0, X)
-        solutions.append((x, u))
+        x, u = ERK3(M, u_0, x)
+        solutions.append((x, u[:r**s]))
         U[s,0] = u[-1]  # Сохраняем только конечную точку
         
         # Проверка сходимости
@@ -102,7 +139,7 @@ def richardson_extrapolation_ERK3(f, u_0, x_0, X, epsilon=1e-6, r=2, p=3, q=1, S
             U[s,l+1] = U[s,l] + R[s,l]
 
     # Расчет эффективных порядков
-    for s in range(2, S):
+    for s in range(3, S):
         for l in range(s-1):
             ratio = np.abs(R[s-1,l] / R[s,l])
             p_eff[s,l] = np.log(ratio) / np.log(r) if R[s,l].any() != 0 else 0
@@ -140,7 +177,7 @@ def richardson_extrapolation_ERK3(f, u_0, x_0, X, epsilon=1e-6, r=2, p=3, q=1, S
     
     return x, u, tables
 
-x, u, tables = richardson_extrapolation_ERK3(f, u_0, x_0, X, eps, r, p, q, S, M)
+x, u, tables = richardson_extrapolation_ERK3_local_thickening(f, u_0, x_0, X, eps, r, p, q, S, M)
 
 x_analytical = np.linspace(x_0, X, M*16)
 y_analytical = 0.5 * x_analytical**2 - np.pi * x_analytical * 0.5 + 1 + (np.pi ** 2) / 8
