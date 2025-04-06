@@ -1,55 +1,49 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
-# Параметры задачи
-x_0 = np.pi/2
-y_0 = 1
-v_0 = 0
-w_0 = 1
-X = 10
-M_initial = 100  # Начальное число шагов
-r = 2           # Коэффициент сгущения
-p = 3           # Порядок метода
-S = 5     # Число уровней сгущения
-eps = 1e-6      # Требуемая точность
-
-u_0 = np.array([y_0, v_0, w_0])
-
-def f(u, x):
-    cot_x = np.cos(x)/(np.sin(x) + 1e-12)
-    return np.array([u[1], u[2], 2*(u[2]-1)*cot_x])
-
-def ERK3_step(current_x, current_u, tau):
-    k1 = f(current_u, current_x)
-    k2 = f(current_u + 0.5*tau*k1, current_x + 0.5*tau)
-    k3 = f(current_u + 0.75*tau*k2, current_x + 0.75*tau)
-    return current_u + tau*(2/9*k1 + 1/3*k2 + 4/9*k3)
-
-def ERK3(M, u_initial, x_start, x_end):
-    """Возвращает сетку и решение на всей сетке"""
-    x = np.linspace(x_start, x_end, M+1)
-    tau = (x_end - x_start)/M
-    u = np.zeros((M+1, 3))
-    u[0] = u_initial
-    for m in range(M):
-        u[m+1] = ERK3_step(x[m], u[m], tau)
-    return x, u
+import math
 
 
-def ERK3_on_grid(M, u_initial, x):
-    """Возвращает сетку и решение на всей сетке"""
-    u = np.zeros((M+1, 3))
-    u[0] = u_initial
-    for m in range(M):
-        u[m+1] = ERK3_step(x[m], u[m], x[m+1] - x[m])
-    return x, u 
+x_0 = np.pi/2# Начальное значение x
+y_0 = 1         # Начальное значение y
+v_0 = 0         # Начальное значение v (y')
+w_0 = 1     # Начальное значение w (y'')
+X = 10    #Конец отрезка
+M = 100
+tau = 0.2
+p = 3; q = 3; S = 3
+r = 2
+eps = 1e-6
+eps_loc = 1e-12
+u_0 = [y_0, v_0, w_0]
 
-def restrict_solution(fine_x, fine_u, coarse_x):
-    """Интерполяция решения с мелкой сетки на грубую"""
-    coarse_u = np.zeros((len(coarse_x), 3))
-    for i in range(3):
-        coarse_u[:,i] = np.interp(coarse_x, fine_x, fine_u[:,i])
-    return coarse_u
+
+def f(u, x) -> np.array:
+    f = np.empty(3)
+    f[0] = u[1]
+    f[1] = u[2]
+    f[2] = 2 * (u[2] - 1) * np.cos(x)/np.sin(x) 
+
+    return f
+
+
+def ERK3_step(current_x, current_u, current_step) -> np.array:
+    w_1 = f(current_u, current_x)
+    w_2 = f(current_u + 1/2*current_step*w_1, current_x + 1/2 * current_step)
+    w_3 = f(current_u + 3/4 * current_step * w_2, current_x + 3/4 * current_step)
+    return current_u + current_step * (2/9*w_1 + 3/9 * w_2 + 4/9 * w_3)
+
+
+def ERK3(x):
+    u = np.empty((len(x) + 1, 3))
+    u[0] = [x_0, y_0, w_0]
+    for m in range(len(x)-1):
+        tau = x[m+1] - x[m]
+        w_1 = f(u[m], x[m])
+        w_2 = f(u[m] + 1/2*tau*w_1, x[m] + 1/2 * tau)
+        w_3 = f(u[m] + 3/4 * tau * w_2, x[m] + 3/4 * x[m])
+        u[m+1] = u[m] + tau * (2/9 * w_1 + 3/9 * w_2 + 4/9 * w_3)
+    return u
+
 
 def ERK3_local_thickening(M, eps, x_0, X) -> tuple[np.array, np.array]:
     tau = (X - x_0) / M
@@ -66,8 +60,8 @@ def ERK3_local_thickening(M, eps, x_0, X) -> tuple[np.array, np.array]:
         error = np.linalg.norm(u[-1][0] - u_thickened[-1][0])
 
         x.append(x[-1] + tau)
-        if error > eps:  # Защита от слишком малых значений
-            tau = ((eps * (r**p - 1) * tau**(p+1)) / (error*(X-x_0))) **(1/p)
+        if error > eps_loc:  # Защита от слишком малых значений
+            tau = ((eps_loc * (r**p - 1) * tau**(p+1)) / (error*(X-x_0))) **(1/p)
             #tau = min(tau_new, 1.1*tau) 
         else:
             tau = 1.1*tau  # Если ошибка слишком мала, увеличиваем шаг
@@ -81,117 +75,54 @@ def ERK3_local_thickening(M, eps, x_0, X) -> tuple[np.array, np.array]:
 
     return np.array(x), np.array(u)
 
-# Генерация решений с разным числом шагов
-x, u = ERK3_local_thickening(M_initial, eps, x_0, X)
-solutions = [u]
-grids = [x]
-for s in range(1, S):
-    M = M_initial * (r ** s)
-    x, u = ERK3_on_grid(M, u_0, x)
-    grids.append(x)
-    solutions.append(u)
 
-# Создание общей базовой сетки (самая грубая)
-base_x = grids[0]
-
-# Таблицы Ричардсона для всех узлов
-U = np.zeros((S, S, len(base_x), 3))  # Экстраполированные решения
-R = np.zeros((S, S, len(base_x), 3))  # Разности
-p_eff = np.zeros((S, S, len(base_x), 3))  # Добавляем компоненты
-
-# Инициализация нулевого уровня
-U[0,0] = restrict_solution(grids[0], solutions[0], base_x)
-
-# Заполнение таблиц
-for s in range(1, S):
-    # Интерполяция текущего решения на базовую сетку
-    U[s,0] = restrict_solution(grids[s], solutions[s], base_x)
-    
-    # Экстраполяция Ричардсона
-    for l in range(1, s+1):
-        factor = r**(p + (l-1)*1)
-        U[s,l] = (factor * U[s,l-1] - U[s-1,l-1]) / (factor - 1)
-        R[s,l-1] = U[s,l-1] - U[s-1,l-1]
+#U = np.zeros((S,S))
+R = np.zeros((S,S))
+p_eff = np.zeros((S,S))
+x, u = ERK3_local_thickening(M, eps_loc, x_0, X)
+U = np.zeros((S,S, len(x)+1))
+U[0, 0] = u[:, 0]
+s = 1
+y_cur = U[0, 0, :]
+y_last = np.empty(len(x))
+while np.linalg.norm(y_cur - y_last) > eps and s < S:
+        u = ERK3(x)
+        print(U[s, 0].size)      
+        print(u[:, 0].size)
+        U[s,0] = u[:, 0]
+        y_last = y_cur
+        y_cur = U[s, 0]
+        s += 1
 
 
+for s in range(1,S):
+    for l in range(s):
+        R[s,l] = (np.linalg.norm(U[s,l] - U[s-1,l]))/(r**(p + l*q) - 1)
+        U[s,l+1] = U[s,l] + R[s,l]
 
-# Изменяем размерность массива для эффективных порядков
-p_eff = np.zeros((S, S, len(base_x), 3))
+for s in range(2,S) :
+    for l in range(s-1) :
+        p_eff[s,l] = np.log(abs(R[s-1,l]/R[s,l]))/np.log(r)
 
-for s in range(2, S):
-    for l in range(1, s):
-        with np.errstate(divide='ignore', invalid='ignore'):
-            for comp in range(3):
-                ratio = np.abs(R[s-1,l-1,:,comp] / R[s,l-1,:,comp])
-                p_eff[s,l,:,comp] = np.log(ratio) / np.log(r)
-
-# Функция для вывода таблицы средних порядков по сетке
-def print_effective_orders(p_eff, component=0):
-    """Выводит таблицу эффективных порядков для выбранной компоненты (0=y, 1=v, 2=w)"""
-    print(f"\nТаблица эффективных порядков (компонента {'yvw'[component]}):")
-    print("s\\l |", end="")
-    for l in range(p_eff.shape[1]):
-        print(f"  l={l:<7} |", end="")
-    print("\n" + "-"*(12*p_eff.shape[1] + 1))
-    
-    for s in range(p_eff.shape[0]):
-        print(f"{s:3} |", end="")
-        for l in range(p_eff.shape[1]):
-            if l >= s: 
-                print(" "*(10) + " |", end="")
-                continue
-                
-            # Усредняем по всем точкам, игнорируя NaN и inf
-            with np.errstate(invalid='ignore'):
-                mean_p = np.nanmean(p_eff[s,l,:,component])
-                mean_p = np.where(np.isinf(mean_p), np.nan, mean_p)
-                mean_p = np.nanmean(mean_p)
-                
-            print(f"  {mean_p:6.3f}   |", end="")
+# Функция выводит форматированную таблицу
+def PrintTriangular(A,i) :
+    print(' ',end=' ')
+    for l in range(len(A)) :
+        print(' p={0:<4d}'.format(p + l*q),end=' ')
+    print()
+    for m in range(len(A)) :
+        print('s={0:<2d}'.format(m),end=' ')
+        for l in range(m + 1 - i) :
+            print('{0:7.4f}'.format(A[m,l]),end=' ')
         print()
+    print()
 
-# Выводим таблицы для всех компонент
-for comp in range(3):
-    print_effective_orders(p_eff, component=comp)
+print('Таблица приближённых значений интеграла:')
+PrintTriangular(U,0)
+print('Таблица оценок ошибок:')
+PrintTriangular(R,1)
+print('Таблица эффективных порядков точности:')
+PrintTriangular(p_eff,2)
 
-
-
-def print_refined_values(U, R, component=0):
-    """Выводит таблицу значений и уточнений для выбранной компоненты (0=y, 1=v, 2=w)"""
-    print(f"\nТаблица значений (компонента {'yvw'[component]}):")
-    print("s\\l |", end="")
-    for l in range(U.shape[1]):
-        print(f"      l={l:<12} |", end="")
-    print("\n" + "-"*(20*U.shape[1] + 1))
-    
-    for s in range(U.shape[0]):
-        print(f"{s:3} |", end="")
-        for l in range(U.shape[1]):
-            if l > s: 
-                print(" "*(18) + " |", end="")
-                continue
-                
-            # Берем последнюю точку (X)
-            value = U[s,l,-1,component] if l == 0 else U[s,l,-1,component]
-            error = R[s,l-1,-1,component] if l > 0 else 0
-                
-            if l == 0:
-                print(f"  {value:12.6e}    |", end="")
-            else:
-                print(f"  {value:12.6e} ({error:+.2e}) |", end="")
-        print()
-
-# Выводим таблицы для всех компонент
-for comp in range(3):
-    print_refined_values(U, R, component=comp)
-    print_effective_orders(p_eff, component=comp)  # Из предыдущего ответа
-
-
-plt.figure()
-for i in range(len(base_x)):
-    plt.semilogy(base_x, p_eff[2,1,:,0], 'b-', alpha=0.3)  # comp=0 (y)
-plt.xlabel('x')
-plt.ylabel('Эффективный порядок')
-plt.title('Распределение порядка точности по сетке (y компонента)')
-plt.grid(True)
-plt.show()
+plt.plot([r**s*M for s in range(1,S)],abs(R[1:,0]),'-bo')
+plt.xscale('log'); plt.yscale('log')
