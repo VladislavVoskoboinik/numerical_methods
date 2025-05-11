@@ -1,45 +1,30 @@
-#Файл в разработке
-# Problem: как считать Ричардсона, если после сгущения размер сетки может измениться?
-
-import math
 import numpy as np
-import matplotlib.pyplot as plt
+import math
 
-# differential equation: y'' = 2*(y-1) * ctg(x), y(pi/2) = 1
-
-# Параметры
-x_0 = np.pi/2# Начальное значение x
-y_0 = 1         # Начальное значение y
-v_0 = 0         # Начальное значение v (y')
-w_0 = 1     # Начальное значение w (y'')
-X = 10     #Конец отрезка
-M = 100
-tau = 0.2
-p = 3; q = 3; S = 3
-eps = 0.1 #Дифур абстрактый, поэтому не получится прикинуть значений eps заранее
-
-r = 2 # Коэффициент сгущения
-
-
-u = [[y_0, v_0, w_0]]
-u_thickened = [[y_0, v_0, w_0]]
-
-
+# Начальные условия
+x_0 = np.pi / 2
+y_0 = 1
+v_0 = 0
+w_0 = 1
+X = 10
+r = 2      # шаг сгущения
+S = 6      # уровни сгущения
+p = 3      # порядок схемы по пространству
+q = 1      # шаг сгущения
+eps = 1e-2
 
 def f(u, x):
     f = np.empty(3)
     f[0] = u[1]
     f[1] = u[2]
-    f[2] = 2 * (u[2] - 1) * np.cos(x)/np.sin(x) 
-
+    f[2] = 2 * (u[0] - 1) * np.cos(x) / np.sin(x)
     return f
 
 def ERK3_step(current_x, current_u, current_step):
-    w_1 = f(current_u, current_x)
-    w_2 = f(current_u + 1/2*current_step*w_1, current_x + 1/2 * current_step)
-    w_3 = f(current_u + 3/4 * current_step * w_2, current_x + 3/4 * current_step)
-    return current_u + current_step * (2/9*w_1 + 3/9 * w_2 + 4/9 * w_3)
-
+    w1 = f(current_u, current_x)
+    w2 = f(current_u + 0.5 * current_step * w1, current_x + 0.5 * current_step)
+    w3 = f(current_u + 0.75 * current_step * w2, current_x + 0.75 * current_step)
+    return current_u + current_step * (2/9*w1 + 3/9*w2 + 4/9*w3)
 
 def ERK3_local_thickening(M, eps, x_0, X):
     tau = (X - x_0) / M
@@ -47,88 +32,83 @@ def ERK3_local_thickening(M, eps, x_0, X):
     u_thickened = [[y_0, v_0, w_0]]
     x = [x_0]
     m = 0
-    while x[-1] < X and m <= M:
-        u.append(ERK3_step(x[-1], u[-1], tau))
-        u_thickened.append(ERK3_step(x[-1], u_thickened[-1], tau/r))
-        u_thickened.append(ERK3_step(x[-1] + tau/r, u_thickened[-1], tau/r))
-        print(u_thickened[-1], u[-1])
-        #error = np.sqrt(sum((u[m][j]**2 - u_thickened[m][j] ** 2) for i in range(3) for j in range(3)))
-        error = np.linalg.norm(u[-1] - u_thickened[-1])
+
+    while x[-1] < X and m <= 5 * M:
+        u_next = ERK3_step(x[-1], u[-1], tau)
+        ut1 = ERK3_step(x[-1], u_thickened[-1], tau / r)
+        ut2 = ERK3_step(x[-1] + tau / r, ut1, tau / r)
+
+        error = np.linalg.norm(u_next - ut2)
+        if x[-1] + tau > X:
+            tau = X - x[-1]
+        u.append(u_next)
+        u_thickened.append(ut1)
+        u_thickened.append(ut2)
         x.append(x[-1] + tau)
-        if error > eps:  # Защита от слишком малых значений
-            tau_new = ((eps * (r**p - 1) * tau**(p+1)) / (error*(X-x_0))) **(1/p)
-            tau = min(tau_new, 2*tau)  # Ограничиваем максимальный рост шага
+
+        if error > eps:
+            tau_new = ((eps * (r ** p - 1) * tau ** (p + 1)) / (error * (X - x_0))) ** (1 / p)
+            tau = max(tau_new, tau / 2)
         else:
-            tau = 2*tau  # Если ошибка слишком мала, увеличиваем шаг
-
-        print(f'x[-1]={x[-1]} : tau={tau}')
-        
+            tau = min(2 * tau, (X - x_0) / M)
         m += 1
-
-    x = np.array(x)
-    u = np.array(u)
 
     return np.array(x), np.array(u)
 
-#x, u = ERK3_local_thickening(r * M, eps, x_0, X)
 
-u_richardson = [[] * S] * S
-R = [[] * S] * S
-p_eff = [[] * S] * S
-#u_richardson = np.array(data)
-#u_richardson = np.zeros((S, (S, (M, 3))))
+U = np.zeros((S, S))
+R = np.zeros((S, S))
+P = np.zeros((S, S))
+
+for s in range(S):
+    M_s = r ** s * 10
+    _, u_vals = ERK3_local_thickening(M_s, eps, x_0, X)
+    U[s, 0] = u_vals[len(u_vals)//2, 0]
 
 for s in range(1, S):
-    x, u = ERK3_local_thickening(r**s * M, eps, x_0, X)
-    u_richardson[s:0].append(u[:, 0])
+    for l in range(s):
+        R[s, l] = (U[s, l] - U[s-1, l]) / (r**(p + l*q) - 1)
+        U[s, l+1] = U[s, l] + R[s, l]
 
-print(u_richardson)
-for s in range(1, S):
-    for l in range(S):
-        R[s, l] = (u_richardson[s, l] - u_richardson[s-1, l]) / (r ** (p + l * q) - 1)
-        u_richardson[s, l+1] = u_richardson[s, l] + R[s, l]
+for s in range(2, S):
+    for l in range(s-1):
+        num = np.abs(U[s-1, l] - U[s-2, l])
+        den = np.abs(U[s, l] - U[s-1, l])
+        if den != 0:
+            P[s, l] = np.log(num / den) / np.log(r)
+        else:
+            P[s, l] = np.nan
 
-'''''
-while x[m] < X:
-    w_1 = f(u[m], x[m])
-    w_2 = f(u[m] + 1/2*tau*w_1, x[m] + 1/2*tau)
-    w_3 = f(u[m] + 3/4*tau*w_2, x[m] + 3/4*tau)
-    u[m+1] = u[m] + tau*(2/9*w_1 + 3/9*w_2 + 4/9*w_3) 
-    
-    error = np.sqrt(np.sum((u[m+1] - u_emb)**2))
-    if error > eps:  # Защита от слишком малых значений
-        tau_new = tau * (eps/error)**(1/(p-1))
-        tau = min(tau_new, 2*tau)  # Ограничиваем максимальный рост шага
-    else:
-        tau = 2*tau  # Если ошибка слишком мала, увеличиваем шаг
-        
-    
-    print(f'm={m} : tau={tau}')
-    
-    w_1 = f(u[m], x[m])
-    w_2 = f(u[m] + 1/2*tau*w_1, x[m] + 1/2*tau)
-    w_3 = f(u[m] + 3/4*tau*w_2, x[m] + 3/4*tau)
-    u[m+1] = u[m] + tau*(2/9*w_1 + 3/9*w_2 + 4/9*w_3) 
-    
-    x[m+1] = x[m] + tau
-    
-    m = m + 1
-'''''
 
-# Аналитическое решение
-x_analytical = np.linspace(x_0, X, M*4)
-y_analytical = 0.5 * x_analytical**2 - np.pi * x_analytical * 0.5 + 1 + (np.pi ** 2) / 8
+def PrintTriangular(A, i, title):
+    print(title)
+    print(' ', end=' ')
+    for l in range(len(A)):
+        print(f'p={p + l*q:<4d}', end=' ')
+    print()
+    for m in range(len(A)):
+        print(f's={m:<2d}', end=' ')
+        for l in range(m + 1 - i):
+            print(f'{A[m, l]:9.6f}', end=' ')
+        print()
+    print()
 
-# Построение графика
-plt.plot(x, u[:, 0], label='ERK3', marker = 'o', color = 'red')
-#plt.plot(x, u_ERK2[:, 0], label = "ERK2")
-#plt.plot(x, u_ERK4[:, 0], label = "ERK3")
-plt.plot(x_analytical, y_analytical, label='Аналитическое решение', linestyle = "--", color = 'green')
-plt.xlim(left = 0)
-plt.ylim(bottom = 0)
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('Решение уравнения третьего порядка\nВыбор шага методом локального сгущения')
-plt.legend()
-plt.grid(True)
-plt.show()
+def PrintTriangularP(A, i, title):
+    print(title)
+    print(' ', end=' ')
+    for l in range(len(A)):
+        print(f'p={p + l*q:<4d}', end=' ')
+    print()
+    for m in range(len(A)):
+        print(f's={m:<2d}', end=' ')
+        for l in range(m + 1 - i):
+            if np.isnan(A[m, l]):
+                print(f"{'—':>9}", end=' ')
+            else:
+                print(f'{A[m, l]:9.4f}', end=' ')
+        print()
+    print()
+
+PrintTriangular(U, 0, 'Таблица приближённых значений y(X):')
+PrintTriangular(R, 1, 'Таблица оценок ошибок:')
+PrintTriangularP(P, 2, 'Таблица эффективного порядка точности:')
