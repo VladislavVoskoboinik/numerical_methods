@@ -2,14 +2,14 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from IPython import get_ipython
+
 #get_ipython().run_line_magic('matplotlib', 'qt')
 
 #   Неявная схема для уравнения теплопроводности на отрезке
 
 # Создание сетки:----------------------------------------------------------
-N=50 # число интервалов по x
-M=50 # число интервалов по t должно удовлетворять условию
+N=500 # число интервалов по x
+M=2*N^2 # число интервалов по t должно удовлетворять условию
                       # M>=2*N^2
 case_bound=1 # выбор варианта граничного условия
                       
@@ -58,9 +58,9 @@ while j<=M-1:
         i+=1
     
     # первый вариант граничного условия при x=1:
-    if case_bound==1:
-        kappa_2=0
-        mu_2=1    
+
+    kappa_2=0
+    mu_2=1    
     # обратный ход прогонки:
     y[j+1][N]=(mu_2 + kappa_2*beta[N-1])/(1-kappa_2*alpha[N-1])
     i=N-1
@@ -77,21 +77,16 @@ while j<=M-1:
 u=np.zeros((M+1,N+1))
 err=np.zeros((M+1,N+1))
 
-N_s = 25#Число членов ряда решения
+def u_a(x_val, t_val):
 
-def u_a(x,t,N):
-    y_a = 0
-    for n in range(1,N+1):
-        y_a = -1/2*(4/(2*n-3)/np.pi*(np.cos((2*n-3)/2*np.pi) - 1) + 4/(2*n+3)/np.pi*(np.cos((2*n+3)/2*np.pi) - 1)) * np.exp(-(np.pi*n/2)**2*t)*np.sin(np.pi*n/2*x) + y_a
-    y_a = y_a - x + 3
-    return y_a
+    return 3 - x_val + np.cos(3 * np.pi * x_val / 4) * np.exp(-(3 * np.pi / 4)**2 * t_val)
 
 
 i=0
 while i<=N:
     j=0
     while j<=M:
-        u[j][i]=u_a(x[i],t[j],N_s)
+        u[j][i]=u_a(x[i],t[j])
         err[j][i]=u[j][i]-y[j][i]
         j+=1
     i+=1
